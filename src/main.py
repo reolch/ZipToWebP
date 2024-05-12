@@ -45,6 +45,8 @@ def convert_images_to_webp(temp_dir):
                 try:
                     future = executor.submit(convert_image_to_webp, input_image_path, output_image_path)
                     futures.append(future)
+                    # 変換された画像のパスをリストに追加
+                    converted_files.append(output_image_path)
                 except Exception as e:
                     print(f"Error converting {input_image_path}: {e}")
             for future in futures:
@@ -70,10 +72,14 @@ def generate_output_zip_filename(input_zip_file):
     return output_zip_filename
 
 def add_files_to_zip(converted_files, output_zip_file, temp_dir):
-    with zipfile.ZipFile(output_zip_file, 'w') as zipf:
-        for converted_file in tqdm(converted_files, desc="Creating output ZIP", unit="file"):
-            arcname = os.path.relpath(converted_file, temp_dir)
-            zipf.write(converted_file, arcname)
+    try:
+        with zipfile.ZipFile(output_zip_file, 'w') as zipf:
+            for converted_file in tqdm(converted_files, desc="Creating output ZIP", unit="file"):
+                arcname = os.path.relpath(converted_file, temp_dir)
+                zipf.write(converted_file, arcname)
+        print("Images successfully added to the output ZIP file.")
+    except Exception as e:
+        print(f"An error occurred while adding images to the output ZIP file: {e}")
 
 def move_input_zip(input_zip_file, output_dir):
     converted_zip_folder = os.path.join(os.path.dirname(output_dir), "Converted_Zip")
