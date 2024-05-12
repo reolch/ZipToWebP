@@ -6,8 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 def convert_image_to_webp(input_image_path, output_image_path):
-    with Image.open(input_image_path) as image:
-        image.save(output_image_path, "webp")
+    try:
+        with Image.open(input_image_path) as image:
+            image.save(output_image_path, "webp")
+    except FileNotFoundError:
+        print(f"Error: Input image file not found: {input_image_path}")
+    except OSError as e:
+        print(f"Error: Unable to open or save image: {e}")
 
 def extract_zip_file(input_zip_file, output_dir):
     try:
@@ -31,14 +36,24 @@ def convert_images_to_webp(temp_dir):
     total_files = len(image_files)
     
     with ThreadPoolExecutor() as executor:
-        for input_image_path in tqdm(image_files, desc="Converting images", unit="file", total=total_files):
-            output_image_name = "00001.webp" if os.path.basename(input_image_path) == "cover.jpeg" else os.path.splitext(os.path.basename(input_image_path))[0] + ".webp"
-            output_image_path = os.path.join(temp_dir, output_image_name)
-            try:
-                executor.submit(convert_image_to_webp, input_image_path, output_image_path)
-                converted_files.append(output_image_path)
-            except Exception as e:
-                print(f"Error converting {input_image_path}: {e}")
+        # すべてのFutureオブジェクトを収集するためのリスト
+        futures = []
+        with tqdm(total=total_files, desc="Converting images", unit="file") as pbar:
+            for input_image_path in image_files:
+                output_image_name = "00001.webp" if os.path.basename(input_image_path) == "cover.jpeg" else os.path.splitext(os.path.basename(input_image_path))[0] + ".webp"
+                output_image_path = os.path.join(temp_dir, output_image_name)
+                try:
+                    # submitメソッドの戻り値はFutureオブジェクト
+                    future = executor.submit(convert_image_to_webp, input_image_path, output_image_path)
+                    # Futureオブジェクトをリストに追加
+                    futures.append(future)
+                except Exception as e:
+                    print(f"Error converting {input_image_path}: {e}")
+            
+            # すべてのFutureオブジェクトの完了を待機し、進捗を更新
+            for future in futures:
+                future.result()  # 完了を待機
+                pbar.update(1)  # 進捗を更新
     
     return converted_files
 
